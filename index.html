@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Training</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">TRAINING</div>
+      <button id="signInBtn" class="btn btn-ghost">Sync live</button>
+      <span id="signedInAs" class="signed-in-as" hidden></span>
+    </header>
+
+    <main id="signedOutView" class="gate" hidden>
+      <p>Loading your workouts…</p>
+    </main>
+
+    <main id="appView" class="app-view" hidden>
+      <nav class="week-strip" id="weekStrip"></nav>
+
+      <section class="day-card">
+        <div class="day-card-header">
+          <div class="day-number" id="dayNumber">--</div>
+          <div class="day-meta">
+            <div class="day-weekday" id="dayWeekday">—</div>
+            <div class="day-monthyear" id="dayMonthYear">—</div>
+          </div>
+          <label class="complete-toggle">
+            <input type="checkbox" id="completeCheckbox" />
+            <span>Done</span>
+          </label>
+        </div>
+
+        <div class="day-body" id="dayBody">
+          <p class="placeholder">Loading…</p>
+        </div>
+
+        <div class="log-block">
+          <label for="notesInput" class="log-label">Notes</label>
+          <textarea id="notesInput" placeholder="Weights used, how it felt, anything to remember…"></textarea>
+          <button id="saveBtn" class="btn btn-primary">Save</button>
+          <span id="saveStatus" class="save-status"></span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
