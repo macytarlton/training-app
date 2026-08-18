@@ -11,17 +11,21 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
 const LOCAL_LOG_KEY = "workoutLogs";
 
 const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 4.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const PLAY_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M5 3.5v9l7-4.5-7-4.5z" fill="currentColor"/></svg>';
 
 const state = {
   live: false, // true once signed in via Google (live sheet read/write)
   accessToken: null,
   monthCache: {}, // live mode: monthName -> { [dayNumber]: text }
-  logsByDate: {}, // "YYYY-MM-DD" -> { sections: {idx:true}, notes }
+  logsByDate: {}, // "YYYY-MM-DD" -> { sections: {idx:true}, notes, rpe }
   selectedDate: null,
+  calAnchor: null, // date used for calendar navigation
+  view: "week", // "week" | "month"
   tokenClient: null,
 };
 
@@ -32,12 +36,14 @@ function getDayText(date) {
     const days = state.monthCache[MONTH_NAMES[date.getMonth()]] || {};
     return days[date.getDate()] || "";
   }
-  const snap = window.SNAPSHOT?.days || {};
-  return snap[dateKey(date)] || "";
+  return window.SNAPSHOT?.days?.[dateKey(date)] || "";
+}
+
+function getVideo(date) {
+  return window.SNAPSHOT?.videos?.[dateKey(date)] || "";
 }
 
 // Split a day's text into checkable sections (blank-line separated blocks).
-// Each section's first line becomes its title, the rest its detail.
 function getSections(date) {
   const text = getDayText(date);
   if (!text) return [];
@@ -53,7 +59,11 @@ function getSections(date) {
 
 function getLog(key) {
   const l = state.logsByDate[key];
-  return { sections: l?.sections ? { ...l.sections } : {}, notes: l?.notes || "" };
+  return {
+    sections: l?.sections ? { ...l.sections } : {},
+    notes: l?.notes || "",
+    rpe: l?.rpe || null,
+  };
 }
 
 function allSectionsDone(date) {
@@ -133,8 +143,6 @@ async function ensureMonthLoaded(monthName) {
   state.monthCache[monthName] = parseMonthRows(rows);
 }
 
-// ---------- Live grid parsing (mirrors the snapshot generator) ----------
-
 const DAY_COLS = [1, 2, 3, 4, 5, 6, 7];
 
 function isDayNumberRow(row) {
@@ -193,12 +201,12 @@ function loadLogsLocal() {
 
 async function loadLogsLive() {
   try {
-    const data = await sheetsGet(`/values/${CONFIG.LOG_SHEET_NAME}!A2:E`, {});
-    for (const [date, , notes, , sectionsJson] of data.values || []) {
+    const data = await sheetsGet(`/values/${CONFIG.LOG_SHEET_NAME}!A2:F`, {});
+    for (const [date, , notes, , sectionsJson, rpe] of data.values || []) {
       if (!date) continue;
       let sections = {};
       try { sections = JSON.parse(sectionsJson || "{}"); } catch { /* ignore */ }
-      state.logsByDate[date] = { sections, notes: notes || "" };
+      state.logsByDate[date] = { sections, notes: notes || "", rpe: rpe ? Number(rpe) : null };
     }
   } catch {
     /* Logs tab may not exist yet */
@@ -211,8 +219,8 @@ async function ensureLogsSheetExists() {
   await sheetsPost(":batchUpdate", {
     requests: [{ addSheet: { properties: { title: CONFIG.LOG_SHEET_NAME } } }],
   });
-  await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A1:E1:append?valueInputOption=RAW`, {
-    values: [["Date", "Completed", "Notes", "Timestamp", "SectionState"]],
+  await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A1:F1:append?valueInputOption=RAW`, {
+    values: [["Date", "Completed", "Notes", "Timestamp", "SectionState", "RPE"]],
   });
 }
 
@@ -225,24 +233,101 @@ async function persist(date) {
     state.logsByDate[key] = log;
     if (state.live) {
       await ensureLogsSheetExists();
-      await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A:E:append?valueInputOption=USER_ENTERED`, {
-        values: [[key, allSectionsDone(date) ? "TRUE" : "FALSE", log.notes, new Date().toISOString(), JSON.stringify(log.sections)]],
+      await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A:F:append?valueInputOption=USER_ENTERED`, {
+        values: [[key, allSectionsDone(date) ? "TRUE" : "FALSE", log.notes, new Date().toISOString(), JSON.stringify(log.sections), log.rpe ?? ""]],
       });
     } else {
       localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(state.logsByDate));
     }
     status.textContent = state.live ? "Saved to sheet." : "Saved.";
-    renderWeekStrip();
+    renderCalendar();
   } catch (err) {
     console.error(err);
     status.textContent = "Save failed — try again.";
   }
 }
 
-// ---------- Rendering ----------
+// ---------- Calendar (week + month views) ----------
+
+function makeDayCell(d, compact) {
+  const el = document.createElement("div");
+  el.className = "cal-day" + (compact ? " compact" : "");
+  if (dateKey(d) === dateKey(state.selectedDate)) el.classList.add("selected");
+  if (allSectionsDone(d)) el.classList.add("completed");
+  if (getDayText(d)) el.classList.add("has-workout");
+  if (compact) {
+    el.innerHTML = `<div class="wd">${d.toLocaleDateString(undefined, { weekday: "short" })}</div><div class="dn">${d.getDate()}</div>`;
+  } else {
+    el.innerHTML = `<div class="dn">${d.getDate()}</div>`;
+  }
+  el.addEventListener("click", () => selectDate(d));
+  return el;
+}
+
+function renderCalendar() {
+  const body = document.getElementById("calBody");
+  const title = document.getElementById("calTitle");
+  body.innerHTML = "";
+  document.getElementById("viewWeek").classList.toggle("active", state.view === "week");
+  document.getElementById("viewMonth").classList.toggle("active", state.view === "month");
+
+  const anchor = state.calAnchor;
+  if (state.view === "week") {
+    title.textContent = anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    const strip = document.createElement("div");
+    strip.className = "week-strip";
+    const base = new Date(anchor);
+    base.setDate(base.getDate() - base.getDay());
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      strip.appendChild(makeDayCell(d, true));
+    }
+    body.appendChild(strip);
+  } else {
+    title.textContent = anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    const grid = document.createElement("div");
+    grid.className = "month-grid";
+    DOW.forEach((d) => {
+      const h = document.createElement("div");
+      h.className = "dow";
+      h.textContent = d;
+      grid.appendChild(h);
+    });
+    const y = anchor.getFullYear(), m = anchor.getMonth();
+    const first = new Date(y, m, 1);
+    const lead = first.getDay();
+    for (let i = 0; i < lead; i++) {
+      const blank = document.createElement("div");
+      blank.className = "cal-day blank";
+      grid.appendChild(blank);
+    }
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      grid.appendChild(makeDayCell(new Date(y, m, day), false));
+    }
+    body.appendChild(grid);
+  }
+}
+
+function shiftCalendar(dir) {
+  const a = new Date(state.calAnchor);
+  if (state.view === "week") a.setDate(a.getDate() + dir * 7);
+  else a.setMonth(a.getMonth() + dir);
+  state.calAnchor = a;
+  renderCalendar();
+}
+
+function setView(view) {
+  state.view = view;
+  renderCalendar();
+}
+
+// ---------- Day card ----------
 
 async function selectDate(date) {
   state.selectedDate = date;
+  state.calAnchor = new Date(date);
   if (state.live) await ensureMonthLoaded(MONTH_NAMES[date.getMonth()]);
   render();
 }
@@ -257,11 +342,21 @@ function toggleSection(index) {
   render();
 }
 
+function setRpe(value) {
+  const key = dateKey(state.selectedDate);
+  const log = getLog(key);
+  log.rpe = log.rpe === value ? null : value; // tap again to clear
+  state.logsByDate[key] = log;
+  persist(state.selectedDate);
+  render();
+}
+
 function render() {
   const d = state.selectedDate;
   const key = dateKey(d);
   const sections = getSections(d);
   const log = getLog(key);
+  const video = getVideo(d);
 
   document.getElementById("dayNumber").textContent = d.getDate();
   document.getElementById("dayWeekday").textContent = d.toLocaleDateString(undefined, { weekday: "long" });
@@ -297,33 +392,55 @@ function render() {
         `</div>`;
       el.querySelector(".section-title").textContent = sec.title;
       el.querySelector(".section-detail").textContent = sec.detail;
+      // Attach the day's demo video to its first section (that's where the
+      // sheet's link lives — the featured / warm-up exercise).
+      if (i === 0 && video) {
+        const play = document.createElement("a");
+        play.className = "play-btn";
+        play.href = video;
+        play.target = "_blank";
+        play.rel = "noopener";
+        play.innerHTML = `${PLAY_SVG}<span>Watch</span>`;
+        play.addEventListener("click", (e) => e.stopPropagation());
+        el.querySelector(".section-body").appendChild(play);
+      }
       el.addEventListener("click", () => toggleSection(i));
       container.appendChild(el);
     });
   }
 
+  // Effort / RPE rating
+  const effortBlock = document.getElementById("effortBlock");
+  effortBlock.hidden = !sections.length;
+  if (sections.length) {
+    const rpeRow = document.getElementById("rpeRow");
+    rpeRow.innerHTML = "";
+    for (let n = 1; n <= 10; n++) {
+      const b = document.createElement("button");
+      b.className = "rpe-btn" + (log.rpe === n ? " active" : "");
+      b.textContent = n;
+      b.addEventListener("click", () => setRpe(n));
+      rpeRow.appendChild(b);
+    }
+    const cap = document.getElementById("rpeCaption");
+    cap.textContent = log.rpe
+      ? `Rated ${log.rpe}/10 — ${rpeLabel(log.rpe)}`
+      : "Tap to rate your effort (RPE 1–10)";
+  }
+
   document.getElementById("notesInput").value = log.notes;
   document.getElementById("saveStatus").textContent = "";
-  renderWeekStrip();
+  renderCalendar();
 }
 
-function renderWeekStrip() {
-  const strip = document.getElementById("weekStrip");
-  strip.innerHTML = "";
-  const base = new Date(state.selectedDate);
-  base.setDate(base.getDate() - base.getDay());
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(base);
-    d.setDate(base.getDate() + i);
-    const el = document.createElement("div");
-    el.className = "week-strip-day";
-    if (dateKey(d) === dateKey(state.selectedDate)) el.classList.add("selected");
-    if (allSectionsDone(d)) el.classList.add("completed");
-    if (getDayText(d)) el.classList.add("has-workout");
-    el.innerHTML = `<div class="wd">${d.toLocaleDateString(undefined, { weekday: "short" })}</div><div class="dn">${d.getDate()}</div>`;
-    el.addEventListener("click", () => selectDate(d));
-    strip.appendChild(el);
-  }
+function rpeLabel(n) {
+  if (n <= 2) return "very easy";
+  if (n <= 4) return "easy";
+  if (n <= 6) return "moderate";
+  if (n === 7) return "hard";
+  if (n === 8) return "very hard";
+  if (n === 9) return "near max";
+  return "max effort";
 }
 
 // ---------- Boot ----------
@@ -347,10 +464,15 @@ document.getElementById("saveBtn").addEventListener("click", () => {
   state.logsByDate[key] = log;
   persist(state.selectedDate);
 });
+document.getElementById("calPrev").addEventListener("click", () => shiftCalendar(-1));
+document.getElementById("calNext").addEventListener("click", () => shiftCalendar(1));
+document.getElementById("viewWeek").addEventListener("click", () => setView("week"));
+document.getElementById("viewMonth").addEventListener("click", () => setView("month"));
 
 // Snapshot mode is always ready immediately — no sign-in required to view.
 loadLogsLocal();
 state.selectedDate = pickInitialDate();
+state.calAnchor = new Date(state.selectedDate);
 document.getElementById("signedOutView").hidden = true;
 document.getElementById("appView").hidden = false;
 render();

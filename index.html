@@ -20,7 +20,18 @@
     </main>
 
     <main id="appView" class="app-view" hidden>
-      <nav class="week-strip" id="weekStrip"></nav>
+      <div class="cal">
+        <div class="cal-head">
+          <button class="cal-nav" id="calPrev" aria-label="Previous">&#8249;</button>
+          <div class="cal-title" id="calTitle">&nbsp;</div>
+          <button class="cal-nav" id="calNext" aria-label="Next">&#8250;</button>
+          <div class="view-toggle">
+            <button id="viewWeek" class="vt-btn">Week</button>
+            <button id="viewMonth" class="vt-btn">Month</button>
+          </div>
+        </div>
+        <div id="calBody"></div>
+      </div>
 
       <section class="day-card">
         <div class="day-card-header">
@@ -33,6 +44,12 @@
         </div>
 
         <div class="sections" id="sections"></div>
+
+        <div class="effort-block" id="effortBlock" hidden>
+          <div class="log-label">How hard was it?</div>
+          <div class="rpe-row" id="rpeRow"></div>
+          <div class="rpe-caption" id="rpeCaption">Tap to rate your effort (RPE 1&ndash;10)</div>
+        </div>
 
         <div class="log-block">
           <label for="notesInput" class="log-label">Notes</label>
