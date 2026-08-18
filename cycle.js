@@ -84,11 +84,13 @@ window.Cycle = (function () {
     const L = cfg.cycleLength || 28;
     const P = cfg.periodLength || 5;
     const t = dayNum(dateStr);
-    // Anchor to the most recent logged start on or before the date.
+    // Anchor to the most recent logged start on or before the date. We do NOT
+    // project backward before the first logged period — guessing past cycles
+    // we have no data for is what made periods appear "too often". Cycle info
+    // shows from the earliest logged start forward (real + predicted ahead).
     let anchor = null;
     for (const s of starts) if (dayNum(s) <= t) anchor = s;
-    const isPredicted = anchor === null || dayNum(anchor) !== t && (anchor === starts[starts.length - 1]);
-    if (anchor === null) anchor = starts[0];
+    if (anchor === null) return null;
     const diff = t - dayNum(anchor);
     const day = (((diff % L) + L) % L) + 1;
     return { day, L, phase: phaseFor(day, L, P) };

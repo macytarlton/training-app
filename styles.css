@@ -182,16 +182,18 @@ html, body {
 .cal-day.compact {
   flex: 0 0 auto;
   width: 58px;
-  padding: 9px 0 12px;
+  min-height: 66px;
+  padding: 9px 2px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .cal-day:not(.compact) {
-  aspect-ratio: 1 / 1;
-}
-.cal-day:not(.compact) .dn {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  min-height: 70px;
+  padding: 10px 3px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .cal-day.blank { background: transparent; border: none; cursor: default; }
 .cal-day .wd { font-size: 11px; letter-spacing: 0.06em; }
@@ -219,33 +221,19 @@ html, body {
 }
 .cal-check svg { width: 9px; height: 9px; }
 
-/* Session-type tags (sprint / lift / push) */
-.type-dots {
-  position: absolute;
-  bottom: 6px;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  gap: 3px;
+/* Session-type labels (sprint / lift / push) written on the day */
+.type-labels {
+  margin-top: auto;
+  padding-top: 3px;
+  width: 100%;
+  text-align: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--accent-strong);
 }
-.cal-day.compact .type-dots { bottom: 5px; }
-.type-dot { width: 6px; height: 6px; border-radius: 50%; }
-.t-sprint { background: #2f80ed; }
-.t-lift { background: #8b5cf6; }
-.t-push { background: #e5533b; }
-
-.cal-legend {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 12px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.cal-legend .lg { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.cal-day.compact .type-labels { font-size: 9px; }
 
 /* Cycle markers on calendar cells (top-right corner dot) */
 .cal-day.cyc-menstrual::before,
@@ -355,11 +343,12 @@ html, body {
 
 .section-body { flex: 1; min-width: 0; }
 .section-title {
-  font-weight: 700;
   font-size: 14px;
   line-height: 1.4;
   margin-bottom: 2px;
 }
+.ex-name { font-weight: 700; }
+.ex-sets { font-weight: 400; }
 .section-detail {
   white-space: pre-wrap;
   line-height: 1.5;

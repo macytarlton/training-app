@@ -281,13 +281,8 @@ function makeDayCell(d, compact) {
   const types = getSessionTypes(d);
   if (types.length) {
     const row = document.createElement("div");
-    row.className = "type-dots";
-    types.forEach((t) => {
-      const s = document.createElement("span");
-      s.className = "type-dot t-" + t;
-      s.title = t;
-      row.appendChild(s);
-    });
+    row.className = "type-labels";
+    row.textContent = types.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(" · ");
     el.appendChild(row);
   }
   el.addEventListener("click", () => selectDate(d));
@@ -420,7 +415,21 @@ function render() {
         `<div class="section-title"></div>` +
         `<div class="section-detail"></div>` +
         `</div>`;
-      el.querySelector(".section-title").textContent = sec.title;
+      // Bold the exercise name; keep the sets/reps after the dash normal weight.
+      const titleEl = el.querySelector(".section-title");
+      const m = sec.title.match(/^(.*?)(\s[-–—]\s.*)$/);
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "ex-name";
+      const setsSpan = document.createElement("span");
+      setsSpan.className = "ex-sets";
+      if (m) {
+        nameSpan.textContent = m[1];
+        setsSpan.textContent = m[2];
+      } else {
+        nameSpan.textContent = sec.title;
+      }
+      titleEl.appendChild(nameSpan);
+      titleEl.appendChild(setsSpan);
       el.querySelector(".section-detail").textContent = sec.detail;
       // Attach the day's demo video to its first section (that's where the
       // sheet's link lives — the featured / warm-up exercise).
