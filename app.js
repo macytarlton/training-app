@@ -43,6 +43,19 @@ function getVideo(date) {
   return window.SNAPSHOT?.videos?.[dateKey(date)] || "";
 }
 
+// Classify a day's session by keywords, for at-a-glance calendar tags.
+// A day can carry more than one tag (e.g. a combined sprint + lift day).
+const SESSION_TYPES = [
+  ["sprint", /\bsprint|\baccel|acceleration|\bmechanic|wall drill|tes stim|max velo|walk-in|dribble|fly-?in|\bflys?\b|a-?skip|a-?switch|\bbounds?\b/i],
+  ["lift", /barbell|back squat|front squat|split squat|goblet squat|bench press|\bpower clean\b|hang clean|hang power|deadlift|\brdl\b|snatch|keiser|max strength|\bstrength\b|overhead press|pin press|oscillatory/i],
+  ["push", /bobsled|pushing|single push|push specific|sled push|push start|push track/i],
+];
+function getSessionTypes(date) {
+  const t = getDayText(date);
+  if (!t) return [];
+  return SESSION_TYPES.filter(([, re]) => re.test(t)).map(([k]) => k);
+}
+
 // Split a day's text into checkable sections (blank-line separated blocks).
 function getSections(date) {
   const text = getDayText(date);
@@ -259,10 +272,23 @@ function makeDayCell(d, compact) {
   if (cyc && (cyc.phase.key === "menstrual" || cyc.phase.key === "ovulation")) {
     el.classList.add("cyc-" + cyc.phase.key);
   }
-  if (compact) {
-    el.innerHTML = `<div class="wd">${d.toLocaleDateString(undefined, { weekday: "short" })}</div><div class="dn">${d.getDate()}</div>`;
-  } else {
-    el.innerHTML = `<div class="dn">${d.getDate()}</div>`;
+  let inner = "";
+  if (allSectionsDone(d)) inner += `<span class="cal-check">${CHECK_SVG}</span>`;
+  if (compact) inner += `<div class="wd">${d.toLocaleDateString(undefined, { weekday: "short" })}</div>`;
+  inner += `<div class="dn">${d.getDate()}</div>`;
+  el.innerHTML = inner;
+
+  const types = getSessionTypes(d);
+  if (types.length) {
+    const row = document.createElement("div");
+    row.className = "type-dots";
+    types.forEach((t) => {
+      const s = document.createElement("span");
+      s.className = "type-dot t-" + t;
+      s.title = t;
+      row.appendChild(s);
+    });
+    el.appendChild(row);
   }
   el.addEventListener("click", () => selectDate(d));
   return el;

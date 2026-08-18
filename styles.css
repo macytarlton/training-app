@@ -182,13 +182,16 @@ html, body {
 .cal-day.compact {
   flex: 0 0 auto;
   width: 58px;
-  padding: 9px 0;
+  padding: 9px 0 12px;
 }
 .cal-day:not(.compact) {
   aspect-ratio: 1 / 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+}
+.cal-day:not(.compact) .dn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 .cal-day.blank { background: transparent; border: none; cursor: default; }
 .cal-day .wd { font-size: 11px; letter-spacing: 0.06em; }
@@ -201,18 +204,48 @@ html, body {
 .cal-day.selected { border-color: var(--accent); background: var(--glass-strong); box-shadow: 0 0 0 2px rgba(31,138,156,0.35); }
 .cal-day.selected .dn { color: var(--accent-strong); }
 
-.cal-day.completed::after {
-  content: "";
+.cal-check {
   position: absolute;
-  bottom: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 5px;
-  height: 5px;
+  top: 4px;
+  left: 5px;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   background: var(--done);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.cal-day.compact.completed::after { position: static; transform: none; margin: 3px auto 0; }
+.cal-check svg { width: 9px; height: 9px; }
+
+/* Session-type tags (sprint / lift / push) */
+.type-dots {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+}
+.cal-day.compact .type-dots { bottom: 5px; }
+.type-dot { width: 6px; height: 6px; border-radius: 50%; }
+.t-sprint { background: #2f80ed; }
+.t-lift { background: #8b5cf6; }
+.t-push { background: #e5533b; }
+
+.cal-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.cal-legend .lg { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 
 /* Cycle markers on calendar cells (top-right corner dot) */
 .cal-day.cyc-menstrual::before,
