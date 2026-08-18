@@ -47,6 +47,7 @@ html, body {
   color: var(--accent-strong);
 }
 
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
 .signed-in-as { font-size: 12px; color: var(--text-muted); }
 
 .btn {
@@ -212,6 +213,22 @@ html, body {
   background: var(--done);
 }
 .cal-day.compact.completed::after { position: static; transform: none; margin: 3px auto 0; }
+
+/* Cycle markers on calendar cells (top-right corner dot) */
+.cal-day.cyc-menstrual::before,
+.cal-day.cyc-ovulation::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.cal-day.compact.cyc-menstrual::before,
+.cal-day.compact.cyc-ovulation::before { top: 5px; right: 8px; }
+.cal-day.cyc-menstrual::before { background: #d76a86; }
+.cal-day.cyc-ovulation::before { background: #e0913c; }
 
 /* Day card */
 .day-card {
@@ -392,3 +409,124 @@ textarea:focus { outline: none; border-color: var(--accent); }
 
 .log-row { display: flex; align-items: center; gap: 12px; }
 .save-status { font-size: 12px; color: var(--done); min-height: 16px; }
+
+/* Cycle strip in the day card */
+.cycle-strip {
+  --cyc: #d76a86;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--cyc);
+  background: color-mix(in srgb, var(--cyc) 9%, var(--glass-strong));
+  border-radius: 12px;
+  padding: 11px 13px;
+}
+.cycle-dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 3px;
+  background: var(--cyc);
+}
+.cycle-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cycle-phase { font-size: 13px; font-weight: 700; color: var(--text); }
+.cycle-note { font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 58, 68, 0.34);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+.modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(165deg, #eaf5f6, #dcedf0);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; }
+.modal-head h2 { margin: 0; font-size: 18px; color: var(--text); }
+.modal-close {
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cycle-today {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.cycle-today .cycle-dot { width: 14px; height: 14px; margin: 0; }
+.cycle-today-phase { font-size: 14px; font-weight: 700; color: var(--text); }
+.cycle-today-energy { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+
+.modal-field { display: flex; flex-direction: column; gap: 8px; }
+.modal-field.two { flex-direction: row; gap: 12px; }
+.modal-field.two > div { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.hint { font-size: 12px; color: var(--text-muted); }
+
+input[type="date"], input[type="number"] {
+  font: inherit;
+  font-size: 14px;
+  background: var(--glass-strong);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  width: 100%;
+}
+input:focus { outline: none; border-color: var(--accent); }
+.modal-field .log-row input[type="date"] { flex: 1; }
+
+.start-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.start-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  padding: 7px 12px;
+}
+.start-remove {
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.disclaimer { font-size: 11.5px; line-height: 1.5; color: var(--text-muted); margin: 0; }

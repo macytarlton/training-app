@@ -255,6 +255,10 @@ function makeDayCell(d, compact) {
   if (dateKey(d) === dateKey(state.selectedDate)) el.classList.add("selected");
   if (allSectionsDone(d)) el.classList.add("completed");
   if (getDayText(d)) el.classList.add("has-workout");
+  const cyc = window.Cycle && Cycle.forDate(dateKey(d));
+  if (cyc && (cyc.phase.key === "menstrual" || cyc.phase.key === "ovulation")) {
+    el.classList.add("cyc-" + cyc.phase.key);
+  }
   if (compact) {
     el.innerHTML = `<div class="wd">${d.toLocaleDateString(undefined, { weekday: "short" })}</div><div class="dn">${d.getDate()}</div>`;
   } else {
@@ -430,7 +434,63 @@ function render() {
 
   document.getElementById("notesInput").value = log.notes;
   document.getElementById("saveStatus").textContent = "";
+  renderCycleStrip(d);
   renderCalendar();
+}
+
+// ---------- Cycle tracking ----------
+
+function renderCycleStrip(d) {
+  const strip = document.getElementById("cycleStrip");
+  if (!window.Cycle) { strip.hidden = true; return; }
+  const cyc = Cycle.forDate(dateKey(d));
+  if (!cyc) { strip.hidden = true; return; }
+  strip.hidden = false;
+  document.getElementById("cycleDot").style.background = cyc.phase.color;
+  document.getElementById("cyclePhase").textContent = `Cycle day ${cyc.day} · ${cyc.phase.label}`;
+  document.getElementById("cycleNote").textContent = cyc.phase.note;
+  strip.style.setProperty("--cyc", cyc.phase.color);
+}
+
+function openCycleModal() {
+  renderCycleModal();
+  document.getElementById("cycleModal").hidden = false;
+}
+function closeCycleModal() {
+  document.getElementById("cycleModal").hidden = true;
+}
+
+function renderCycleModal() {
+  const cfg = Cycle.load();
+  const today = Cycle.forDate(dateKey(new Date()));
+  const todayEl = document.getElementById("cycleToday");
+  if (today) {
+    todayEl.innerHTML =
+      `<span class="cycle-dot"></span>` +
+      `<div><div class="cycle-today-phase">Today: day ${today.day} · ${today.phase.label}</div>` +
+      `<div class="cycle-today-energy">Energy: ${today.phase.energy}</div></div>`;
+    todayEl.querySelector(".cycle-dot").style.background = today.phase.color;
+  } else {
+    todayEl.innerHTML = "";
+  }
+
+  document.getElementById("cycleLen").value = cfg.cycleLength;
+  document.getElementById("periodLen").value = cfg.periodLength;
+
+  const list = document.getElementById("startList");
+  list.innerHTML = "";
+  cfg.periodStarts.slice().sort().reverse().forEach((s) => {
+    const li = document.createElement("li");
+    const label = new Date(s + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    li.innerHTML = `<span>${label}</span>`;
+    const rm = document.createElement("button");
+    rm.className = "start-remove";
+    rm.textContent = "×";
+    rm.setAttribute("aria-label", "Remove");
+    rm.addEventListener("click", () => { Cycle.removeStart(s); renderCycleModal(); render(); });
+    li.appendChild(rm);
+    list.appendChild(li);
+  });
 }
 
 function rpeLabel(n) {
@@ -468,6 +528,29 @@ document.getElementById("calPrev").addEventListener("click", () => shiftCalendar
 document.getElementById("calNext").addEventListener("click", () => shiftCalendar(1));
 document.getElementById("viewWeek").addEventListener("click", () => setView("week"));
 document.getElementById("viewMonth").addEventListener("click", () => setView("month"));
+
+document.getElementById("cycleBtn").addEventListener("click", openCycleModal);
+document.getElementById("cycleStrip").addEventListener("click", openCycleModal);
+document.getElementById("cycleClose").addEventListener("click", closeCycleModal);
+document.getElementById("cycleModal").addEventListener("click", (e) => {
+  if (e.target.id === "cycleModal") closeCycleModal();
+});
+document.getElementById("periodAdd").addEventListener("click", () => {
+  const v = document.getElementById("periodDate").value;
+  if (!v) return;
+  Cycle.addStart(v);
+  document.getElementById("periodDate").value = "";
+  renderCycleModal();
+  render();
+});
+document.getElementById("cycleLen").addEventListener("change", (e) => {
+  Cycle.setLengths(Number(e.target.value), null);
+  render();
+});
+document.getElementById("periodLen").addEventListener("change", (e) => {
+  Cycle.setLengths(null, Number(e.target.value));
+  render();
+});
 
 // Snapshot mode is always ready immediately — no sign-in required to view.
 loadLogsLocal();

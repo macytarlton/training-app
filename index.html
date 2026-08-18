@@ -11,8 +11,11 @@
   <div id="app">
     <header class="topbar">
       <div class="brand">TRAINING</div>
-      <button id="signInBtn" class="btn btn-ghost">Sync live</button>
-      <span id="signedInAs" class="signed-in-as" hidden></span>
+      <div class="topbar-actions">
+        <button id="cycleBtn" class="btn btn-ghost">Cycle</button>
+        <button id="signInBtn" class="btn btn-ghost">Sync live</button>
+        <span id="signedInAs" class="signed-in-as" hidden></span>
+      </div>
     </header>
 
     <main id="signedOutView" class="gate" hidden>
@@ -43,6 +46,14 @@
           <span class="progress-badge" id="progressBadge" hidden></span>
         </div>
 
+        <button class="cycle-strip" id="cycleStrip" hidden type="button">
+          <span class="cycle-dot" id="cycleDot"></span>
+          <span class="cycle-text">
+            <span class="cycle-phase" id="cyclePhase"></span>
+            <span class="cycle-note" id="cycleNote"></span>
+          </span>
+        </button>
+
         <div class="sections" id="sections"></div>
 
         <div class="effort-block" id="effortBlock" hidden>
@@ -63,7 +74,42 @@
     </main>
   </div>
 
+  <div class="modal-backdrop" id="cycleModal" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Cycle tracking</h2>
+        <button class="modal-close" id="cycleClose" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="cycle-today" id="cycleToday"></div>
+
+      <div class="modal-field">
+        <label class="log-label">Log a new period start</label>
+        <div class="log-row">
+          <input type="date" id="periodDate" />
+          <button class="btn btn-primary" id="periodAdd">Add</button>
+        </div>
+        <div class="hint">Tap this on day 1 of each period to keep predictions accurate.</div>
+        <ul class="start-list" id="startList"></ul>
+      </div>
+
+      <div class="modal-field two">
+        <div>
+          <label class="log-label" for="cycleLen">Cycle length (days)</label>
+          <input type="number" id="cycleLen" min="20" max="45" />
+        </div>
+        <div>
+          <label class="log-label" for="periodLen">Period length (days)</label>
+          <input type="number" id="periodLen" min="1" max="10" />
+        </div>
+      </div>
+
+      <p class="disclaimer">General, evidence-informed guidance — not medical advice. Everyone's cycle is different, so treat this as a nudge to listen to your body. Your period dates stay in this browser.</p>
+    </div>
+  </div>
+
   <script src="data.js"></script>
+  <script src="cycle.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
