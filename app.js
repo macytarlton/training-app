@@ -14,11 +14,13 @@ const MONTH_NAMES = [
 
 const LOCAL_LOG_KEY = "workoutLogs";
 
+const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 4.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 const state = {
   live: false, // true once signed in via Google (live sheet read/write)
   accessToken: null,
   monthCache: {}, // live mode: monthName -> { [dayNumber]: text }
-  logsByDate: {}, // "YYYY-MM-DD" -> { completed, notes }
+  logsByDate: {}, // "YYYY-MM-DD" -> { sections: {idx:true}, notes }
   selectedDate: null,
   tokenClient: null,
 };
@@ -34,6 +36,33 @@ function getDayText(date) {
   return snap[dateKey(date)] || "";
 }
 
+// Split a day's text into checkable sections (blank-line separated blocks).
+// Each section's first line becomes its title, the rest its detail.
+function getSections(date) {
+  const text = getDayText(date);
+  if (!text) return [];
+  return text
+    .split(/\n{2,}/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n");
+      return { title: lines[0].trim(), detail: lines.slice(1).join("\n").trim() };
+    });
+}
+
+function getLog(key) {
+  const l = state.logsByDate[key];
+  return { sections: l?.sections ? { ...l.sections } : {}, notes: l?.notes || "" };
+}
+
+function allSectionsDone(date) {
+  const sections = getSections(date);
+  if (!sections.length) return false;
+  const log = getLog(dateKey(date));
+  return sections.every((_, i) => log.sections[i]);
+}
+
 // ---------- Google sign-in (optional upgrade) ----------
 
 function initAuth() {
@@ -43,10 +72,7 @@ function initAuth() {
     client_id: CONFIG.CLIENT_ID,
     scope: CONFIG.SCOPE,
     callback: async (resp) => {
-      if (resp.error) {
-        console.error("OAuth error", resp);
-        return;
-      }
+      if (resp.error) { console.error("OAuth error", resp); return; }
       state.accessToken = resp.access_token;
       state.live = true;
       document.getElementById("signInBtn").hidden = true;
@@ -167,9 +193,12 @@ function loadLogsLocal() {
 
 async function loadLogsLive() {
   try {
-    const data = await sheetsGet(`/values/${CONFIG.LOG_SHEET_NAME}!A2:D`, {});
-    for (const [date, completed, notes] of data.values || []) {
-      if (date) state.logsByDate[date] = { completed: completed === "TRUE", notes: notes || "" };
+    const data = await sheetsGet(`/values/${CONFIG.LOG_SHEET_NAME}!A2:E`, {});
+    for (const [date, , notes, , sectionsJson] of data.values || []) {
+      if (!date) continue;
+      let sections = {};
+      try { sections = JSON.parse(sectionsJson || "{}"); } catch { /* ignore */ }
+      state.logsByDate[date] = { sections, notes: notes || "" };
     }
   } catch {
     /* Logs tab may not exist yet */
@@ -182,24 +211,26 @@ async function ensureLogsSheetExists() {
   await sheetsPost(":batchUpdate", {
     requests: [{ addSheet: { properties: { title: CONFIG.LOG_SHEET_NAME } } }],
   });
-  await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A1:D1:append?valueInputOption=RAW`, {
-    values: [["Date", "Completed", "Notes", "Timestamp"]],
+  await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A1:E1:append?valueInputOption=RAW`, {
+    values: [["Date", "Completed", "Notes", "Timestamp", "SectionState"]],
   });
 }
 
-async function saveLog(date, completed, notes) {
+async function persist(date) {
   const key = dateKey(date);
+  const log = getLog(key);
   const status = document.getElementById("saveStatus");
   status.textContent = "Saving…";
   try {
+    state.logsByDate[key] = log;
     if (state.live) {
       await ensureLogsSheetExists();
-      await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A:D:append?valueInputOption=USER_ENTERED`, {
-        values: [[key, completed ? "TRUE" : "FALSE", notes, new Date().toISOString()]],
+      await sheetsPost(`/values/${CONFIG.LOG_SHEET_NAME}!A:E:append?valueInputOption=USER_ENTERED`, {
+        values: [[key, allSectionsDone(date) ? "TRUE" : "FALSE", log.notes, new Date().toISOString(), JSON.stringify(log.sections)]],
       });
+    } else {
+      localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(state.logsByDate));
     }
-    state.logsByDate[key] = { completed, notes };
-    if (!state.live) localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(state.logsByDate));
     status.textContent = state.live ? "Saved to sheet." : "Saved.";
     renderWeekStrip();
   } catch (err) {
@@ -216,28 +247,61 @@ async function selectDate(date) {
   render();
 }
 
+function toggleSection(index) {
+  const key = dateKey(state.selectedDate);
+  const log = getLog(key);
+  log.sections[index] = !log.sections[index];
+  if (!log.sections[index]) delete log.sections[index];
+  state.logsByDate[key] = log;
+  persist(state.selectedDate);
+  render();
+}
+
 function render() {
   const d = state.selectedDate;
   const key = dateKey(d);
-  const text = getDayText(d);
-  const log = state.logsByDate[key] || { completed: false, notes: "" };
+  const sections = getSections(d);
+  const log = getLog(key);
 
   document.getElementById("dayNumber").textContent = d.getDate();
   document.getElementById("dayWeekday").textContent = d.toLocaleDateString(undefined, { weekday: "long" });
   document.getElementById("dayMonthYear").textContent = d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
-  const body = document.getElementById("dayBody");
-  body.innerHTML = "";
-  if (text) {
-    body.textContent = text;
+  const doneCount = sections.filter((_, i) => log.sections[i]).length;
+  const badge = document.getElementById("progressBadge");
+  if (sections.length) {
+    badge.hidden = false;
+    badge.textContent = doneCount === sections.length ? "All done" : `${doneCount} / ${sections.length}`;
+    badge.classList.toggle("all-done", doneCount === sections.length);
   } else {
-    const p = document.createElement("p");
-    p.className = "placeholder";
-    p.textContent = "Nothing programmed for this day.";
-    body.appendChild(p);
+    badge.hidden = true;
   }
 
-  document.getElementById("completeCheckbox").checked = log.completed;
+  const container = document.getElementById("sections");
+  container.innerHTML = "";
+  if (!sections.length) {
+    const p = document.createElement("p");
+    p.className = "day-empty";
+    p.textContent = "Nothing programmed for this day.";
+    container.appendChild(p);
+  } else {
+    sections.forEach((sec, i) => {
+      const done = !!log.sections[i];
+      const el = document.createElement("div");
+      el.className = "section" + (done ? " done" : "");
+      el.innerHTML =
+        `<div class="section-check">${CHECK_SVG}</div>` +
+        `<div class="section-body">` +
+        `<div class="section-title"></div>` +
+        `<div class="section-detail"></div>` +
+        `</div>`;
+      el.querySelector(".section-title").textContent = sec.title;
+      el.querySelector(".section-detail").textContent = sec.detail;
+      el.addEventListener("click", () => toggleSection(i));
+      container.appendChild(el);
+    });
+  }
+
   document.getElementById("notesInput").value = log.notes;
   document.getElementById("saveStatus").textContent = "";
   renderWeekStrip();
@@ -251,11 +315,10 @@ function renderWeekStrip() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(base);
     d.setDate(base.getDate() + i);
-    const log = state.logsByDate[dateKey(d)];
     const el = document.createElement("div");
     el.className = "week-strip-day";
     if (dateKey(d) === dateKey(state.selectedDate)) el.classList.add("selected");
-    if (log?.completed) el.classList.add("completed");
+    if (allSectionsDone(d)) el.classList.add("completed");
     if (getDayText(d)) el.classList.add("has-workout");
     el.innerHTML = `<div class="wd">${d.toLocaleDateString(undefined, { weekday: "short" })}</div><div class="dn">${d.getDate()}</div>`;
     el.addEventListener("click", () => selectDate(d));
@@ -268,7 +331,6 @@ function renderWeekStrip() {
 function pickInitialDate() {
   const today = new Date();
   if (getDayText(today)) return today;
-  // Snapshot ends in June; land on the most recent day that has a workout.
   const keys = Object.keys(window.SNAPSHOT?.days || {}).sort();
   if (keys.length) {
     const [y, m, day] = keys[keys.length - 1].split("-").map(Number);
@@ -278,15 +340,12 @@ function pickInitialDate() {
 }
 
 document.getElementById("signInBtn").addEventListener("click", signIn);
-document.getElementById("completeCheckbox").addEventListener("change", (e) => {
-  saveLog(state.selectedDate, e.target.checked, document.getElementById("notesInput").value);
-});
 document.getElementById("saveBtn").addEventListener("click", () => {
-  saveLog(
-    state.selectedDate,
-    document.getElementById("completeCheckbox").checked,
-    document.getElementById("notesInput").value
-  );
+  const key = dateKey(state.selectedDate);
+  const log = getLog(key);
+  log.notes = document.getElementById("notesInput").value;
+  state.logsByDate[key] = log;
+  persist(state.selectedDate);
 });
 
 // Snapshot mode is always ready immediately — no sign-in required to view.
@@ -296,6 +355,5 @@ document.getElementById("signedOutView").hidden = true;
 document.getElementById("appView").hidden = false;
 render();
 
-// Wire up optional live sync once the Google script has loaded.
 if (window.google?.accounts?.oauth2) initAuth();
 else window.addEventListener("load", initAuth);

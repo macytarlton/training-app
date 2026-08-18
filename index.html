@@ -26,24 +26,21 @@
         <div class="day-card-header">
           <div class="day-number" id="dayNumber">--</div>
           <div class="day-meta">
-            <div class="day-weekday" id="dayWeekday">—</div>
-            <div class="day-monthyear" id="dayMonthYear">—</div>
+            <div class="day-weekday" id="dayWeekday">&nbsp;</div>
+            <div class="day-monthyear" id="dayMonthYear">&nbsp;</div>
           </div>
-          <label class="complete-toggle">
-            <input type="checkbox" id="completeCheckbox" />
-            <span>Done</span>
-          </label>
+          <span class="progress-badge" id="progressBadge" hidden></span>
         </div>
 
-        <div class="day-body" id="dayBody">
-          <p class="placeholder">Loading…</p>
-        </div>
+        <div class="sections" id="sections"></div>
 
         <div class="log-block">
           <label for="notesInput" class="log-label">Notes</label>
           <textarea id="notesInput" placeholder="Weights used, how it felt, anything to remember…"></textarea>
-          <button id="saveBtn" class="btn btn-primary">Save</button>
-          <span id="saveStatus" class="save-status"></span>
+          <div class="log-row">
+            <button id="saveBtn" class="btn btn-primary">Save notes</button>
+            <span id="saveStatus" class="save-status"></span>
+          </div>
         </div>
       </section>
     </main>
